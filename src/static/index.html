@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Excel File</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Uploaded Excel File</h1>
+        <input type="file" id="fileInput" class="form-control-file mb-3" accept=".xls,.xlsx" required>
+        <button id="loadButton" class="btn btn-primary mb-3">Load Excel File</button>
+        <div id="excelTable"></div>
+        <button id="downloadButton" class="btn btn-success mt-3" style="display: none;">Download Selected Rows</button>
+        <div id="message" class="mt-3" style="display: none;"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.3/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            let originalData = [];
+
+            $('#loadButton').click(function() {
+                let fileInput = document.getElementById('fileInput');
+                let file = fileInput.files[0];
+                if (file) {
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        let data = new Uint8Array(e.target.result);
+                        let workbook = XLSX.read(data, {type: 'array'});
+                        let sheetName = workbook.SheetNames[0];
+                        let sheet = workbook.Sheets[sheetName];
+
+                        // Convert the original data to display on the web page
+                        originalData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                        let originalHtml = XLSX.utils.sheet_to_html(sheet);
+                        $('#excelTable').html(originalHtml);
+
+                        // Add checkboxes to each row
+                        $('#excelTable table tr').each(function() {
+                            $(this).prepend('<td><input type="checkbox"></td>');
+                        });
+
+                        // Show download button
+                        $('#downloadButton').show();
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    alert('Please select a file.');
+                }
+            });
+
+            $('#downloadButton').click(function() {
+                let selectedRows = $('#excelTable table input[type="checkbox"]:checked').closest('tr');
+                if (selectedRows.length === 0) {
+                    alert('Please select at least one row to download.');
+                    return;
+                }
+                let workbook = XLSX.utils.book_new();
+                let newSheet = XLSX.utils.aoa_to_sheet([]);
+                let rowIndex = 0;
+                selectedRows.each(function() {
+                    let rowData = [];
+                    $(this).find('td').each(function() {
+                        rowData.push($(this).text());
+                    });
+                    XLSX.utils.sheet_add_aoa(newSheet, [rowData], {origin: rowIndex});
+                    rowIndex++;
+                });
+                XLSX.utils.book_append_sheet(workbook, newSheet, 'selected_rows');
+                let wbout = XLSX.write(workbook, {bookType: 'xlsx', type: 'binary'});
+                function s2ab(s) {
+                    let buf = new ArrayBuffer(s.length);
+                    let view = new Uint8Array(buf);
+                    for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+                    return buf;
+                }
+                saveAs(new Blob([s2ab(wbout)], {type: 'application/octet-stream'}), 'selected_rows.xlsx');
+            });
+
+            function removeDuplicates(sheetData) {
+                let map = {};
+                let newData = [];
+                for (let row of sheetData) {
+                    let key = row.join(',');
+                    if (!(key in map)) {
+                        map[key] = true;
+                        newData.push(row);
+                    }
+                }
+                return newData;
+            }
+
+            $('#fileInput').change(function() {
+                // Clear message and hide it
+                $('#message').html('').hide();
+            });
+
+            $('#loadButton').click(function() {
+                // Clear message and hide it
+                $('#message').html('').hide();
+            });
+
+            $('#downloadButton').click(function() {
+                // Clear message and hide it
+                $('#message').html('').hide();
+            });
+
+            $('#loadButton').click(function() {
+                let fileInput = document.getElementById('fileInput');
+                let file = fileInput.files[0];
+                if (file) {
+                    let reader = new FileReader();
+                    reader.onload = function(e) {
+                        let data = new Uint8Array(e.target.result);
+                        let workbook = XLSX.read(data, {type: 'array'});
+                        let sheetName = workbook.SheetNames[0];
+                        let sheet = workbook.Sheets[sheetName];
+
+                        // Convert the original data to display on the web page
+                        originalData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                        let originalHtml = XLSX.utils.sheet_to_html(sheet);
+                        $('#excelTable').html(originalHtml);
+
+                        // Add checkboxes to each row
+                        $('#excelTable table tr').each(function() {
+                            $(this).prepend('<td><input type="checkbox"></td>');
+                        });
+
+                        // Show download button
+                        $('#downloadButton').show();
+
+                        // Remove duplicates
+                        let sheetData = XLSX.utils.sheet_to_json(sheet, {header: 1});
+                        let uniqueSheetData = removeDuplicates(sheetData);
+                        if (uniqueSheetData.length < sheetData.length) {
+                            $('#message').html('Duplicate rows found and removed.').show();
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    alert('Please select a file.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
